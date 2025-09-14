@@ -74,6 +74,8 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "verify_me")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
 PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 SHEET_ID = os.getenv("SHEET_ID", "")
+# Opcional: restringir quién puede usar el bot (números separados por coma). Ej: "+5215512345678,+5213311122233"
+ALLOWED_NUMBERS = [n.strip() for n in os.getenv("ALLOWED_NUMBERS", "").split(",") if n.strip()]
 
 # Timezone MX
 TZ = os.getenv("TZ", "America/Mexico_City")
@@ -217,11 +219,21 @@ def wa_send_text(wa_id: str, text: str) -> None:
 
 # -------------------- WEBHOOKS --------------------
 
+@app.get("/")
+def root_ok():
+    # Endpoint para health-check de Render
+    return "OK", 200
+
+@app.get("/health")
+def health_ok():
+    return jsonify({"status": "ok", "time": now_local_iso()}), 200
+
 @app.get("/webhook")
 def verify():
     mode = request.args.get("hub.mode")
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
+    logger.info("Webhook verify: mode=%s token_match=%s", mode, str(token == VERIFY_TOKEN))
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
     return "forbidden", 403
@@ -238,6 +250,12 @@ def inbound():
         wa_from = msg.get("from")  # phone
         text = (msg.get("text", {}) or {}).get("body", "").strip()
         logger.info("Msg from %s: %s", wa_from, text)
+
+        # Filtro opcional de números permitidos
+        if ALLOWED_NUMBERS and wa_from not in ALLOWED_NUMBERS:
+            logger.warning("Número no autorizado: %s", wa_from)
+            wa_send_text(wa_from, "Este número no está autorizado para usar el bot.")
+            return jsonify({"status": "ok"})
 
         # Routing
         if RE_AYUDA.match(text):
