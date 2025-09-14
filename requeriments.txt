@@ -1,7 +1,0 @@
-Flask==3.0.3
-gunicorn==21.2.0
-requests==2.32.3
-gspread==6.1.2
-google-auth==2.33.0
-python-dotenv==1.0.1
-pytz==2024.1
